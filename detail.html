@@ -1,0 +1,114 @@
+
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AEKI - Detail Produk</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2935/2935853.png">
+</head>
+<body class="bg-[#121212] text-gray-100 font-sans">
+
+<nav class="bg-stone-900 text-white px-6 py-4">
+  <div class="max-w-6xl mx-auto flex justify-between items-center">
+    <h1 class="text-2xl font-bold">AEKI <span class="text-amber-400">Cerita Kopi</span></h1>
+    <a href="index.html" class="text-sm hover:underline">Kembali</a>
+  </div>
+</nav>
+
+<main class="max-w-6xl mx-auto p-6">
+  <div id="detailArea" class="hidden">
+    <div class="bg-[#1E1E1E] rounded-2xl shadow-lg p-6 flex flex-col md:flex-row gap-8">
+      <div class="flex-1">
+        <img id="detailImgHero" src="" alt="Foto" class="w-full rounded-xl object-cover shadow-md">
+      </div>
+      <div class="flex-[1.5] space-y-4">
+        <h1 id="detailNama" class="text-3xl font-bold"></h1>
+        <p id="detailRingkasan" class="text-gray-300"></p>
+        <div class="flex gap-2 mt-3"><span id="detailBadge" class="bg-green-900/40 text-green-300 px-3 py-1 rounded-full text-sm"></span></div>
+        <div class="flex gap-2 mt-2"><span id="pillAsal" class="bg-gray-800 px-3 py-1 rounded-full text-sm"></span><span id="pillHarga" class="bg-gray-800 px-3 py-1 rounded-full text-sm"></span></div>
+        <a id="btnWA" target="_blank" class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-5 py-3 rounded-xl">Pesan via WhatsApp</a>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6 mt-8">
+      <div class="md:col-span-2 bg-[#1E1E1E] p-5 rounded-xl">
+        <h3 class="font-semibold text-lg mb-2">Profil Rasa</h3>
+        <canvas id="radarTaste" width="400" height="300" class="bg-gray-800/40 p-3 rounded-xl"></canvas>
+      </div>
+      <div class="bg-[#1E1E1E] p-5 rounded-xl">
+        <h3 class="font-semibold text-lg mb-2">Ringkasan Cepat</h3>
+        <dl class="text-gray-300">
+          <dt class="text-gray-400">Nama</dt><dd id="asideNama">-</dd>
+          <dt class="text-gray-400">Asal</dt><dd id="asideAsal">-</dd>
+          <dt class="text-gray-400">Harga</dt><dd id="asideHarga">-</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div id="offlineBox" class="text-center py-12">
+    <p class="text-yellow-400 font-semibold">⚠️ Tidak dapat memuat data produk. Pastikan koneksi internet aktif.</p>
+  </div>
+</main>
+
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyBKcH2BXe5c3RtieUdM2pZArRs_NiFgXt0",
+  authDomain: "aeki-cerita-kopi.firebaseapp.com",
+  databaseURL: "https://aeki-cerita-kopi-default-rtdb.firebaseio.com",
+  projectId: "aeki-cerita-kopi",
+  storageBucket: "aeki-cerita-kopi.firebasestorage.app",
+  messagingSenderId: "67809009578",
+  appId: "1:67809009578:web:888c79fd360972ee6655d3",
+  measurementId: "G-FGVK46LSSF"
+};
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const params = new URLSearchParams(window.location.search);
+const id = params.get('id');
+
+const detailArea = document.getElementById('detailArea');
+const offlineBox = document.getElementById('offlineBox');
+
+async function loadProduct(id) {
+  try {
+    const dbRef = ref(db);
+    const snap = await get(child(dbRef, `produk/${id}`));
+    if (!snap.exists()) throw new Error('not found');
+    const p = snap.val();
+    // populate
+    document.getElementById('detailNama').textContent = p.nama || '-';
+    document.getElementById('detailRingkasan').textContent = p.deskripsi || p.rasa || '-';
+    document.getElementById('detailBadge').textContent = (p.kategori||'') + ' • ' + (p.jenis||'');
+    document.getElementById('pillAsal').textContent = p.asal || '-';
+    document.getElementById('pillHarga').textContent = p.harga ? ('Rp '+p.harga) : '-';
+    document.getElementById('detailImgHero').src = p.gambar || 'https://via.placeholder.com/800x600?text=No+Image';
+    document.getElementById('btnWA').href = 'https://wa.me/6282164966635?text=' + encodeURIComponent('Halo, saya ingin pesan '+(p.nama||''));
+
+    // charts (simple)
+    const radarCtx = document.getElementById('radarTaste').getContext('2d');
+    const labels = ['Aroma','Acidity','Body','Sweetness','Aftertaste'];
+    const data = [6, (p.keasaman && p.keasaman.toLowerCase().includes('tinggi'))?8:5, (p.body && p.body.toLowerCase().includes('full'))?8:5, (p.rasa && p.rasa.toLowerCase().includes('manis'))?7:4,5];
+    new Chart(radarCtx, { type:'radar', data:{ labels, datasets:[{ label:'Profil Rasa', data, borderColor:'rgba(200,154,107,0.95)', backgroundColor:'rgba(200,154,107,0.18)' }]}, options:{ plugins:{ legend:{ display:false } }, scales:{ r:{ suggestedMin:0, suggestedMax:10 } } } });
+
+    detailArea.classList.remove('hidden');
+    offlineBox.classList.add('hidden');
+  } catch(e) {
+    console.error(e);
+    detailArea.classList.add('hidden');
+    offlineBox.classList.remove('hidden');
+  }
+}
+
+if (id) loadProduct(id); else { offlineBox.innerHTML = '<p class="text-yellow-400">ID produk tidak ditemukan di URL.</p>'; }
+
+</script>
+</body>
+</html>

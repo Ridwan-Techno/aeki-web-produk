@@ -1,0 +1,139 @@
+
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AEKI - Cerita Kopi (Index)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2935/2935853.png">
+</head>
+<body class="bg-white text-stone-900 min-h-screen">
+
+<nav class="bg-stone-900 text-white px-6 py-4">
+  <div class="max-w-6xl mx-auto flex justify-between items-center">
+    <h1 class="text-2xl font-bold">AEKI <span class="text-amber-400">Cerita Kopi</span></h1>
+    <div class="space-x-4">
+      <a href="index.html" class="hover:underline">Beranda</a>
+      <a href="#admin" id="adminToggle" class="hover:underline">Admin</a>
+    </div>
+  </div>
+</nav>
+
+<main class="max-w-6xl mx-auto p-6">
+  <section id="home">
+    <h2 class="text-3xl font-bold mb-4">Daftar Produk Kopi</h2>
+    <div class="flex gap-4 mb-6">
+      <input id="searchPublic" placeholder="Cari nama / asal / jenis..." class="border p-2 rounded w-1/3">
+      <select id="filterKategoriPublic" class="border p-2 rounded"><option value="">Semua Kategori</option><option>Green Bean</option><option>Roasting</option></select>
+      <select id="filterJenisPublic" class="border p-2 rounded"><option value="">Semua Jenis</option><option>Arabica</option><option>Robusta</option></select>
+    </div>
+
+    <div id="produkList" class="grid md:grid-cols-3 gap-6"></div>
+  </section>
+
+  <!-- admin panel hidden by default -->
+  <section id="admin" class="hidden mt-10 bg-stone-100 p-6 rounded">
+    <h3 class="text-xl font-semibold mb-4">Admin - Tambah Produk (demo)</h3>
+    <div class="grid md:grid-cols-2 gap-3">
+      <input id="newNama" placeholder="Nama" class="border p-2 rounded">
+      <input id="newAsal" placeholder="Asal" class="border p-2 rounded">
+      <input id="newHarga" placeholder="Harga (angka)" class="border p-2 rounded">
+      <input id="newStok" placeholder="Stok (angka)" class="border p-2 rounded">
+      <input id="newGambar" placeholder="Link gambar" class="border p-2 rounded md:col-span-2">
+      <textarea id="newDeskripsi" placeholder="Deskripsi" class="border p-2 rounded md:col-span-2"></textarea>
+    </div>
+    <div class="mt-4">
+      <button id="addProduk" class="bg-amber-500 text-white px-4 py-2 rounded">Tambah Produk</button>
+      <button id="logoutAdmin" class="ml-2 bg-stone-400 text-white px-4 py-2 rounded">Sembunyikan Admin</button>
+    </div>
+  </section>
+</main>
+
+<footer class="bg-stone-900 text-stone-300 text-center py-6">© 2025 AEKI - Cerita Kopi</footer>
+
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyBKcH2BXe5c3RtieUdM2pZArRs_NiFgXt0",
+  authDomain: "aeki-cerita-kopi.firebaseapp.com",
+  databaseURL: "https://aeki-cerita-kopi-default-rtdb.firebaseio.com",
+  projectId: "aeki-cerita-kopi",
+  storageBucket: "aeki-cerita-kopi.firebasestorage.app",
+  messagingSenderId: "67809009578",
+  appId: "1:67809009578:web:888c79fd360972ee6655d3",
+  measurementId: "G-FGVK46LSSF"
+};
+// Firebase imports
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const produkRef = ref(db, 'produk');
+
+// state
+let produkData = [];
+
+function matchesFilter(item, q, jenis, kategori) {
+  const qLow = (q||'').toLowerCase();
+  return (!qLow || (item.nama||'').toLowerCase().includes(qLow) || (item.asal||'').toLowerCase().includes(qLow) )
+    && (!jenis || item.jenis===jenis) && (!kategori || item.kategori===kategori);
+}
+
+// render products
+function renderProdukPublic() {
+  const q = document.getElementById('searchPublic').value || '';
+  const jenis = document.getElementById('filterJenisPublic').value;
+  const kategori = document.getElementById('filterKategoriPublic').value;
+  const list = document.getElementById('produkList');
+  list.innerHTML = '';
+  const filtered = produkData.filter(p => matchesFilter(p,q,jenis,kategori));
+  if(filtered.length===0) { list.innerHTML = '<p class="col-span-3 text-center text-stone-500">Tidak ada produk.</p>'; return; }
+  filtered.forEach(p=>{
+    const card=document.createElement('div');
+    card.className='bg-white rounded-xl shadow p-4';
+    card.innerHTML = `
+      <img src="${p.gambar||'https://via.placeholder.com/600x400?text=No+Image'}" class="h-48 w-full object-cover rounded mb-3">
+      <h3 class="font-semibold text-lg">${p.nama||"-"}</h3>
+      <p class="text-sm text-stone-500">${p.asal||"-"}</p>
+      <div class="mt-3 flex justify-between items-center">
+        <span class="text-stone-700 font-semibold">${p.harga?("Rp "+p.harga):"-"}</span>
+        <a href="detail.html?id=${'${p.id}'}" class="bg-amber-500 text-white px-3 py-1 rounded">Lihat</a>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// bind firebase realtime
+onValue(produkRef, (snap)=>{
+  const raw = snap.val() || { };
+  produkData = Object.keys(raw).map(k => Object.assign({ id:k }, raw[k])).sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+  renderProdukPublic();
+});
+
+// search & filters
+['searchPublic','filterJenisPublic','filterKategoriPublic'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('input', renderProdukPublic);
+});
+
+// admin toggle
+document.getElementById('adminToggle').addEventListener('click',(e)=>{ e.preventDefault(); document.getElementById('admin').classList.remove('hidden'); });
+document.getElementById('logoutAdmin').addEventListener('click',()=>{ document.getElementById('admin').classList.add('hidden'); });
+
+// add product (simple push)
+document.getElementById('addProduk').addEventListener('click', async ()=>{
+  const nama=document.getElementById('newNama').value.trim();
+  const asal=document.getElementById('newAsal').value.trim();
+  const harga=document.getElementById('newHarga').value.trim();
+  const stok=parseInt(document.getElementById('newStok').value||'0',10);
+  const gambar=document.getElementById('newGambar').value.trim();
+  const deskripsi=document.getElementById('newDeskripsi').value.trim();
+  if(!nama||!asal) return alert('Isi nama dan asal produk.');
+  const obj={ nama, asal, harga, stok, gambar, deskripsi, createdAt: Date.now() };
+  try{ await push(produkRef).then(r=>set(r,obj)); alert('Tersimpan.'); }catch(e){ console.error(e); alert('Gagal menyimpan'); }
+});
+</script>
+</body>
+</html>
